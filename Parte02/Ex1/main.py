@@ -12,7 +12,7 @@ def main():
     print("python main function")
 
     # Reading the image from disk
-    original_image = cv2.imread('lake.jpg', cv2.IMREAD_COLOR)
+    original_image = cv2.imread('/home/ville/Desktop/savi_25-26_student/Parte02/Ex1/lake.jpg', cv2.IMREAD_COLOR)
     # cv2.imshow('Original', image)
 
     # Make the image darker on the right hand side
