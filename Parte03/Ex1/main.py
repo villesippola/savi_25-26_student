@@ -18,7 +18,7 @@ def main():
         description='Counts cars',
         epilog='This is finished')
 
-    parser.add_argument('-if', '--input_filename', type=str, default='../docs/traffic.mp4')
+    parser.add_argument('-if', '--input_filename', type=str, default='/home/ville/Desktop/savi_25-26_student/Parte03/docs/traffic.mp4')
 
     args = vars(parser.parse_args())
     print(args)
