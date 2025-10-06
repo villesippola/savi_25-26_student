@@ -15,7 +15,8 @@ def main():
     # --------------------------
     # Read image
     # --------------------------
-    image_filename = '/home/mike/GoogleDrive/UA/Aulas/2025-2026/1ºSem/SAVI_25-26/savi_25-26/Parte02/images/praia.png'
+    # image_filename = '/home/mike/GoogleDrive/UA/Aulas/2025-2026/1ºSem/SAVI_25-26/savi_25-26/Parte02/images/praia.png'
+    image_filename = '/home/ville/Desktop/savi_25-26_student/Parte02/images/praia.png'
     image = cv2.imread(image_filename, cv2.IMREAD_COLOR)
     h, w, numchannels = image.shape
 
