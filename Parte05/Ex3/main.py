@@ -23,7 +23,7 @@ def main():
     # ------------------------------------
     parser = argparse.ArgumentParser(prog='Optimization for a line')
 
-    parser.add_argument('-f', '--filename', type=str, default='../Ex1/data.json')
+    parser.add_argument('-f', '--filename', type=str, default='/home/ville/Desktop/savi_25-26_student/Parte05/Ex1/data.json')
     parser.add_argument('-ni', '--number_iterations', type=int, default=500)
 
     args = vars(parser.parse_args())
