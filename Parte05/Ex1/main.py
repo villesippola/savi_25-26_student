@@ -20,7 +20,7 @@ def main():
     # ------------------------------------
     parser = argparse.ArgumentParser(prog='Optimization for a line')
 
-    parser.add_argument('-f', '--filename', type=str, default='./data.json')
+    parser.add_argument('-f', '--filename', type=str, default='/home/ville/Desktop/savi_25-26_student/Parte05/Ex1/data.json')
     parser.add_argument(
         '-n', '--npoints', type=int, default=10,
         help='Number of points clicked. You can also use ESC if you want to stop before that.')
