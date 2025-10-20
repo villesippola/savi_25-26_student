@@ -19,8 +19,8 @@ def main():
         description='Counts cars',
         epilog='This is finished')
 
-    parser.add_argument('-qi', '--query_image', type=str, default='../images/santorini/1.png')
-    parser.add_argument('-ti', '--target_image', type=str, default='../images/santorini/1.png')
+    parser.add_argument('-qi', '--query_image', type=str, default='/home/ville/Desktop/savi_25-26_student/Parte04/images/santorini/1.png')
+    parser.add_argument('-ti', '--target_image', type=str, default='/home/ville/Desktop/savi_25-26_student/Parte04/images/santorini/1.png')
 
     args = vars(parser.parse_args())
     print(args)
