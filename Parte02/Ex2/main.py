@@ -13,7 +13,7 @@ def main():
     print("python main function")
 
     # dataset_path = '/home/mike/GoogleDrive/UA/Aulas/2025-2026/1ºSem/SAVI_25-26/savi_25-26/Parte02/cat_dog_savi'
-    dataset_path = '/home/ville/Desktop/savi_25-26_student/Parte02/cat_dog_savi'
+    dataset_path = '/home/ville/Documents/savi_25-26_student/Parte02/cat_dog_savi'
 
     # --------------------------------
     # READING THE DATASET
@@ -32,7 +32,7 @@ def main():
 
     # Read the lavbels file
     # labels_filename = '/home/mike/GoogleDrive/UA/Aulas/2025-2026/1ºSem/SAVI_25-26/savi_25-26/Parte02/cat_dog_savi/labels.txt'
-    labels_filename = '/home/ville/Desktop/savi_25-26_student/Parte02/cat_dog_savi/labels.txt'
+    labels_filename = '/home/ville/Documents/savi_25-26_student/Parte02/cat_dog_savi/labels.txt'
     file_handle = open(labels_filename)
     labels = []
     for line in file_handle:

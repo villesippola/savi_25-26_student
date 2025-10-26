@@ -5,7 +5,7 @@ import cv2  # import the opencv library
 def main():
     print("python main function")
 
-    image = cv2.imread('lake.jpg', cv2.IMREAD_COLOR)
+    image = cv2.imread('/home/ville/Documents/savi_25-26_student/Parte01/ExemploAula/lake.jpg', cv2.IMREAD_COLOR)
 
     # Print info on the image
     print(image.dtype)
