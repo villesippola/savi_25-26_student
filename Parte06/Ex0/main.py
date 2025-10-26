@@ -29,8 +29,8 @@ def main():
     # parser.add_argument('-qi', '--query_image', type=str, default='../images/castle/1.png')
     # parser.add_argument('-ti', '--target_image', type=str, default='../images/castle/2.png')
 
-    parser.add_argument('-qi', '--query_image', type=str, default='../images/machu_pichu/2.png')
-    parser.add_argument('-ti', '--target_image', type=str, default='../images/machu_pichu/1.png')
+    parser.add_argument('-qi', '--query_image', type=str, default='/home/ville/Documents/savi_25-26_student/Parte06/images/machu_pichu/2.png')
+    parser.add_argument('-ti', '--target_image', type=str, default='/home/ville/Documents/savi_25-26_student/Parte06/images/machu_pichu/1.png')
 
     args = vars(parser.parse_args())
     print(args)

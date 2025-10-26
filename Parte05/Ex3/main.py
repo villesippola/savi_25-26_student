@@ -88,5 +88,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-y = a(x-h) ^ 2 + k
