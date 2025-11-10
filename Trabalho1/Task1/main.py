@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 # shebang line for linux / mac
 
-from copy import deepcopy
+import copy
 from functools import partial
 import glob
 from random import randint
-# from matplotlib import pyplot as plt
 from matplotlib import pyplot as plt
 import numpy as np
 import argparse
@@ -33,10 +32,28 @@ view = {
 }
 
 
+def draw_registration_result(source, target, transformation, title="Registration Result"):
+    source_temp = copy.deepcopy(source)
+    target_temp = copy.deepcopy(target)
+    source_temp.paint_uniform_color([1, 0.706, 0])  # orange
+    target_temp.paint_uniform_color([0, 0.651, 0.929])  # blue
+    source_temp.transform(transformation)
+    
+    axes_mesh = o3d.geometry.TriangleMesh().create_coordinate_frame(size=0.5)
+    
+    print(f"\n{title}")
+    o3d.visualization.draw_geometries([source_temp, target_temp, axes_mesh],
+                                      window_name=title,
+                                      zoom=0.53999999999999981,
+                                      front=view['trajectory'][0]['front'],
+                                      lookat=view['trajectory'][0]['lookat'],
+                                      up=view['trajectory'][0]['up'])
+
+
 def main():
 
     # ------------------------------------
-    # Visualize the point cloud
+    # Load and create point clouds
     # ------------------------------------
     filename_rgb1 = '../tum_dataset/rgb/1.png'
     rgb1 = o3d.io.read_image(filename_rgb1)
@@ -46,6 +63,7 @@ def main():
 
     # Create the rgbd image
     rgbd1 = o3d.geometry.RGBDImage.create_from_tum_format(rgb1, depth1)
+    print("RGBD Image 1:")
     print(rgbd1)
 
     filename_rgb2 = '../tum_dataset/rgb/2.png'
@@ -56,18 +74,10 @@ def main():
 
     # Create the rgbd image
     rgbd2 = o3d.geometry.RGBDImage.create_from_tum_format(rgb2, depth2)
+    print("RGBD Image 2:")
     print(rgbd2)
 
-    # Show the images using matplotlib
-    # plt.subplot(1, 2, 1)
-    # plt.title('TUM grayscale image')
-    # plt.imshow(rgbd1.color)
-    # plt.subplot(1, 2, 2)
-    # plt.title('TUM depth image')
-    # plt.imshow(rgbd1.depth)
-    # plt.show()
-
-    # Obtain the point cloud from the rgbd image
+    # Obtain the point clouds from the rgbd images
     pcd1 = o3d.geometry.PointCloud.create_from_rgbd_image(
         rgbd1, o3d.camera.PinholeCameraIntrinsic(
             o3d.camera.PinholeCameraIntrinsicParameters.PrimeSenseDefault))
@@ -76,50 +86,82 @@ def main():
         rgbd2, o3d.camera.PinholeCameraIntrinsic(
             o3d.camera.PinholeCameraIntrinsicParameters.PrimeSenseDefault))
 
-    # Flip it, otherwise the pointcloud will be upside down
-    # pcd.transform([[1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]])
-    # o3d.visualization.draw_geometries([pcd], zoom=0.35)
-
-    threshold = 0.02
-    trans_init = np.asarray([[0.862, 0.011, -0.507, 0.5],
-                            [-0.139, 0.967, -0.215, 0.7],
-                            [0.487, 0.255, 0.835, -1.4], [0.0, 0.0, 0.0, 1.0]])
-
-    print("Initial alignment")
-    evaluation = o3d.pipelines.registration.evaluate_registration(
-        pcd1, pcd2, threshold, trans_init)
-    print(evaluation)
-
-    print("Apply point-to-point ICP")
-    reg_p2p = o3d.pipelines.registration.registration_icp(
-        pcd1, pcd2, threshold, trans_init,
-        o3d.pipelines.registration.TransformationEstimationPointToPoint())
-    print(reg_p2p)
-    print("Transformation is:")
-    print(reg_p2p.transformation)
-    draw_registration_result(source, target, reg_p2p.transformation)
-
     # ------------------------------------
-    # Visualize the point cloud
+    # Visualize before registration
     # ------------------------------------
-
     axes_mesh = o3d.geometry.TriangleMesh().create_coordinate_frame(size=0.5)
 
-    # # Create entities list of objects to draw
-    # entities = [pcd1, axes_mesh]
-    # entities = [pcd2, axes_mesh]
-
-    # paint points to get a better visualization
-    pcd1.paint_uniform_color([1, 0, 0])  # reg, green, blue
-    pcd2.paint_uniform_color([0, 0, 1])
+    # Paint points to get a better visualization
+    pcd1.paint_uniform_color([1, 0, 0])  # red
+    pcd2.paint_uniform_color([0, 0, 1])  # blue
     entities = [pcd1, pcd2, axes_mesh]
 
-    # # Draw the geometries
+    print("\n=== Before ICP Registration ===")
     o3d.visualization.draw_geometries(entities,
+                                      window_name="Before ICP Registration",
                                       front=view['trajectory'][0]['front'],
                                       lookat=view['trajectory'][0]['lookat'],
                                       up=view['trajectory'][0]['up'],
-                                      zoom=view['trajectory'][0]['zoom'],)
+                                      zoom=view['trajectory'][0]['zoom'])
+
+    # ------------------------------------
+    # ICP Registration
+    # ------------------------------------
+    
+    # Set source and target (pcd2 will be aligned to pcd1)
+    source = pcd2
+    target = pcd1
+    
+    # ICP parameters
+    threshold = 0.02  # 2cm maximum correspondence distance
+    trans_init = np.identity(4)  # Start with identity matrix (no transformation)
+    
+    # Estimate normals for point-to-plane ICP
+    source.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30))
+    target.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30))
+    
+    # Visualize initial alignment (identity transformation)
+    print("\n=== Initial Alignment (Identity) ===")
+    draw_registration_result(source, target, trans_init, "Initial Alignment")
+    
+    # Evaluate initial alignment
+    print("\nInitial alignment evaluation:")
+    evaluation = o3d.pipelines.registration.evaluate_registration(
+        source, target, threshold, trans_init)
+    print(f"Fitness: {evaluation.fitness:.4f}")
+    print(f"Inlier RMSE: {evaluation.inlier_rmse:.4f}")
+    
+    # Apply point-to-plane ICP
+    print("\n=== Applying Point-to-Plane ICP ===")
+    reg_p2plane = o3d.pipelines.registration.registration_icp(
+        source, target, threshold, trans_init,
+        o3d.pipelines.registration.TransformationEstimationPointToPlane())
+    
+    print("\nICP Registration Result:")
+    print(f"Fitness: {reg_p2plane.fitness:.4f}")
+    print(f"Inlier RMSE: {reg_p2plane.inlier_rmse:.4f}")
+    print("\nTransformation matrix:")
+    print(reg_p2plane.transformation)
+    
+    # Visualize final alignment
+    draw_registration_result(source, target, reg_p2plane.transformation, 
+                            "After ICP Registration")
+    
+    # ------------------------------------
+    # Show aligned point clouds with original colors
+    # ------------------------------------
+    pcd2_aligned = copy.deepcopy(pcd2)
+    pcd2_aligned.transform(reg_p2plane.transformation)
+    pcd2_aligned.paint_uniform_color([0, 0, 1])  # blue
+    pcd1.paint_uniform_color([1, 0, 0])  # red
+    
+    print("\n=== Final Aligned Point Clouds ===")
+    o3d.visualization.draw_geometries([pcd1, pcd2_aligned, axes_mesh],
+                                      window_name="Final Aligned Point Clouds",
+                                      front=view['trajectory'][0]['front'],
+                                      lookat=view['trajectory'][0]['lookat'],
+                                      up=view['trajectory'][0]['up'],
+                                      zoom=view['trajectory'][0]['zoom'])
 
 
 if __name__ == '__main__':
