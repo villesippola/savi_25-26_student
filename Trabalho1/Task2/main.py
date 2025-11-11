@@ -76,6 +76,12 @@ def main():
         rgbd2, o3d.camera.PinholeCameraIntrinsic(
             o3d.camera.PinholeCameraIntrinsicParameters.PrimeSenseDefault))
 
+    # ------------------------------------
+    # Downsampling
+    # ------------------------------------
+    downsampled_pcd1 = pcd1.voxel_down_sample(voxel_size=0.03)
+    downsampled_pcd2 = pcd2.voxel_down_sample(voxel_size=0.03)
+    
     # Flip it, otherwise the pointcloud will be upside down
     # pcd.transform([[1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]])
     # o3d.visualization.draw_geometries([pcd], zoom=0.35)
@@ -91,9 +97,9 @@ def main():
     # entities = [pcd2, axes_mesh]
 
     # paint points to get a better visualization
-    pcd1.paint_uniform_color([1, 0, 0])  # reg, green, blue
-    pcd2.paint_uniform_color([0, 0, 1])
-    entities = [pcd1, pcd2, axes_mesh]
+    downsampled_pcd1.paint_uniform_color([1, 0, 0])  # reg, green, blue
+    downsampled_pcd2.paint_uniform_color([0, 0, 1])
+    entities = [downsampled_pcd1, downsampled_pcd2, axes_mesh]
 
     # # Draw the geometries
     o3d.visualization.draw_geometries(entities,
