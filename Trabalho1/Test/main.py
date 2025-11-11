@@ -62,7 +62,7 @@ def load_and_filter_depth(rgb_path, depth_path, depth_scale=5000.0, depth_trunc=
     
     # Convert to Open3D images
     rgb_o3d = o3d.geometry.Image(rgb_cv.astype(np.uint8))
-    depth_o3d = o3d.geometry.Image((depth_cv * 1000).astype(np.float32))  # Open3D expects mm
+    depth_o3d = o3d.geometry.Image(depth_cv.astype(np.float32))  # Open3D expects mm
     
     return rgb_o3d, depth_o3d
 
@@ -82,7 +82,7 @@ def create_point_cloud_from_rgbd(rgb_o3d, depth_o3d, intrinsic):
     # Create RGBD image
     rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(
         rgb_o3d, depth_o3d, 
-        depth_scale=1000.0,  # We converted to mm
+        depth_scale=1.0,  # We converted to mm
         depth_trunc=3.0,
         convert_rgb_to_intensity=False
     )
@@ -338,21 +338,21 @@ def main():
     # ------------------------------------
     # You can adjust these values based on visual inspection
     # Format: 4x4 transformation matrix
-    initial_transform = np.array([
-        [1.0, 0.0, 0.0, 0.0],
-        [0.0, 1.0, 0.0, 0.0],
-        [0.0, 0.0, 1.0, 0.0],
-        [0.0, 0.0, 0.0, 1.0]
-    ])
-    
-    # Alternative: You can provide a rough initial guess
-    # For example, if you know there's a small rotation and translation:
     # initial_transform = np.array([
-    #     [0.99, -0.1, 0.0, 0.1],
-    #     [0.1, 0.99, 0.0, 0.0],
+    #     [1.0, 0.0, 0.0, 0.0],
+    #     [0.0, 1.0, 0.0, 0.0],
     #     [0.0, 0.0, 1.0, 0.0],
     #     [0.0, 0.0, 0.0, 1.0]
     # ])
+    
+    # Alternative: You can provide a rough initial guess
+    # For example, if you know there's a small rotation and translation:
+    initial_transform = np.array([
+        [0.99, -0.1, 0.0, 0.1],
+        [0.1, 0.99, 0.0, 0.0],
+        [0.0, 0.0, 1.0, 0.0],
+        [0.0, 0.0, 0.0, 1.0]
+    ])
     
     print("\nInitial transformation matrix:")
     print(initial_transform)
