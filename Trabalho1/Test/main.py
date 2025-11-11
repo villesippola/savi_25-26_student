@@ -1,10 +1,37 @@
 #!/usr/bin/env python3
+# shebang line for linux / mac
 
+from copy import deepcopy
+from functools import partial
+import glob
+from random import randint
 import numpy as np
+import argparse
 import open3d as o3d
 import cv2
 from scipy.optimize import least_squares
 from scipy.spatial.transform import Rotation
+
+
+view = {
+    "class_name": "ViewTrajectory",
+    "interval": 29,
+    "is_loop": False,
+    "trajectory":
+        [
+            {
+                "boundingbox_max": [10.0, 34.024543762207031, 11.225864410400391],
+                "boundingbox_min": [-39.714397430419922, -16.512752532958984, -1.9472264051437378],
+                "field_of_view": 60.0,
+                "front": [0.87911045824568079, -0.1143707949631662, 0.46269225567601935],
+                "lookat": [-14.857198715209961, 8.7558956146240234, 4.6393190026283264],
+                "up": [-0.45122740480118839, 0.11291073802962912, 0.88523725316662361],
+                "zoom": 0.53999999999999981
+            }
+        ],
+    "version_major": 1,
+    "version_minor": 0
+}
 
 
 def load_and_filter_depth(rgb_path, depth_path, depth_scale=5000.0, depth_trunc=3.0):
@@ -14,32 +41,33 @@ def load_and_filter_depth(rgb_path, depth_path, depth_scale=5000.0, depth_trunc=
     Args:
         rgb_path: Path to RGB image
         depth_path: Path to depth image
-        depth_scale: Scale factor for depth (TUM uses 5000.0)
-        depth_trunc: Maximum depth value in meters
+        depth_scale: Scale factor for depth values (TUM uses 5000.0)
+        depth_trunc: Maximum depth value to consider (in meters)
     
     Returns:
-        rgb_o3d: Open3D Image object (RGB)
-        depth_o3d: Open3D Image object (Depth)
+        rgb_o3d: Open3D RGB image
+        depth_o3d: Open3D depth image (filtered)
     """
     # Load images with OpenCV
     rgb_cv = cv2.imread(rgb_path)
     rgb_cv = cv2.cvtColor(rgb_cv, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB
-    depth_cv = cv2.imread(depth_path, cv2.IMREAD_UNCHANGED)
+    
+    depth_cv = cv2.imread(depth_path, cv2.IMREAD_UNCHANGED)  # Load as 16-bit
     
     # Filter depth values
-    # Set invalid depth values (0 or too far) to 0
-    depth_cv = depth_cv.astype(np.float32) / depth_scale
-    depth_cv[depth_cv > depth_trunc] = 0
-    depth_cv = (depth_cv * depth_scale).astype(np.uint16)
+    # Remove invalid depth values (0 or too far)
+    depth_cv = depth_cv.astype(np.float32) / depth_scale  # Convert to meters
+    depth_cv[depth_cv > depth_trunc] = 0  # Truncate far values
+    depth_cv[depth_cv <= 0] = 0  # Remove invalid values
     
-    # Convert OpenCV arrays to Open3D Image objects
+    # Convert to Open3D images
     rgb_o3d = o3d.geometry.Image(rgb_cv.astype(np.uint8))
-    depth_o3d = o3d.geometry.Image(depth_cv)
+    depth_o3d = o3d.geometry.Image((depth_cv * 1000).astype(np.float32))  # Open3D expects mm
     
     return rgb_o3d, depth_o3d
 
 
-def create_point_cloud(rgb_o3d, depth_o3d, intrinsic):
+def create_point_cloud_from_rgbd(rgb_o3d, depth_o3d, intrinsic):
     """
     Create point cloud from RGB-D images.
     
@@ -49,12 +77,17 @@ def create_point_cloud(rgb_o3d, depth_o3d, intrinsic):
         intrinsic: Camera intrinsic parameters
     
     Returns:
-        Point cloud object
+        pcd: Open3D point cloud
     """
     # Create RGBD image
-    rgbd = o3d.geometry.RGBDImage.create_from_tum_format(rgb_o3d, depth_o3d)
+    rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(
+        rgb_o3d, depth_o3d, 
+        depth_scale=1000.0,  # We converted to mm
+        depth_trunc=3.0,
+        convert_rgb_to_intensity=False
+    )
     
-    # Generate point cloud
+    # Create point cloud
     pcd = o3d.geometry.PointCloud.create_from_rgbd_image(rgbd, intrinsic)
     
     return pcd
@@ -69,7 +102,7 @@ def preprocess_point_cloud(pcd, voxel_size=0.03):
         voxel_size: Voxel size for downsampling
     
     Returns:
-        Preprocessed point cloud with normals
+        pcd_down: Downsampled point cloud with normals
     """
     # Downsampling
     pcd_down = pcd.voxel_down_sample(voxel_size)
@@ -77,296 +110,300 @@ def preprocess_point_cloud(pcd, voxel_size=0.03):
     # Normal estimation
     pcd_down.estimate_normals(
         search_param=o3d.geometry.KDTreeSearchParamHybrid(
-            radius=voxel_size * 2, max_nn=30
+            radius=voxel_size * 2,
+            max_nn=30
         )
     )
+    
+    # Orient normals consistently
+    pcd_down.orient_normals_consistent_tangent_plane(k=15)
     
     return pcd_down
 
 
-def transformation_matrix_to_vector(T):
+def transform_params_to_matrix(params):
     """
-    Convert 4x4 transformation matrix to 6D vector [tx, ty, tz, rx, ry, rz].
-    Rotation is represented as Euler angles (in radians).
-    """
-    translation = T[:3, 3]
-    rotation_matrix = T[:3, :3]
-    rotation = Rotation.from_matrix(rotation_matrix)
-    euler_angles = rotation.as_euler('xyz', degrees=False)
+    Convert 6-parameter vector to 4x4 transformation matrix.
     
-    return np.concatenate([translation, euler_angles])
-
-
-def vector_to_transformation_matrix(vec):
+    Args:
+        params: [rx, ry, rz, tx, ty, tz] - rotation (axis-angle) and translation
+    
+    Returns:
+        T: 4x4 transformation matrix
     """
-    Convert 6D vector [tx, ty, tz, rx, ry, rz] to 4x4 transformation matrix.
-    """
+    rotation = Rotation.from_rotvec(params[:3])
     T = np.eye(4)
-    T[:3, 3] = vec[:3]  # Translation
-    rotation = Rotation.from_euler('xyz', vec[3:], degrees=False)
     T[:3, :3] = rotation.as_matrix()
-    
+    T[:3, 3] = params[3:]
     return T
 
 
 def point_to_plane_residuals(params, source_points, target_points, target_normals):
     """
-    Calculate point-to-plane residuals for ICP optimization.
+    Calculate point-to-plane residuals for optimization.
     
     Args:
-        params: 6D transformation vector [tx, ty, tz, rx, ry, rz]
-        source_points: Source point cloud points (Nx3)
-        target_points: Target point cloud points (Nx3)
-        target_normals: Target point cloud normals (Nx3)
+        params: [rx, ry, rz, tx, ty, tz] - transformation parameters
+        source_points: Nx3 array of source points
+        target_points: Nx3 array of corresponding target points
+        target_normals: Nx3 array of target normals
     
     Returns:
-        Array of residuals (point-to-plane distances)
+        residuals: N array of point-to-plane distances
     """
     # Convert parameters to transformation matrix
-    T = vector_to_transformation_matrix(params)
+    T = transform_params_to_matrix(params)
     
     # Transform source points
-    source_points_hom = np.hstack([source_points, np.ones((source_points.shape[0], 1))])
-    transformed_points = (T @ source_points_hom.T).T[:, :3]
+    source_homogeneous = np.hstack([source_points, np.ones((source_points.shape[0], 1))])
+    transformed_source = (T @ source_homogeneous.T).T[:, :3]
     
     # Calculate point-to-plane distances
-    diff = transformed_points - target_points
+    diff = transformed_source - target_points
     residuals = np.sum(diff * target_normals, axis=1)
     
     return residuals
 
 
-def find_correspondences(source_pcd, target_pcd, max_correspondence_distance):
-    """
-    Find nearest neighbor correspondences between source and target point clouds.
-    
-    Args:
-        source_pcd: Source point cloud
-        target_pcd: Target point cloud
-        max_correspondence_distance: Maximum distance for valid correspondence
-    
-    Returns:
-        Indices and distances of correspondences
-    """
-    # Build KD-Tree for target point cloud
-    target_tree = o3d.geometry.KDTreeFlann(target_pcd)
-    
-    source_points = np.asarray(source_pcd.points)
-    correspondences = []
-    distances = []
-    
-    for i, point in enumerate(source_points):
-        # Find nearest neighbor in target
-        [k, idx, dist] = target_tree.search_knn_vector_3d(point, 1)
-        
-        if dist[0] < max_correspondence_distance ** 2:  # dist is squared distance
-            correspondences.append((i, idx[0]))
-            distances.append(np.sqrt(dist[0]))
-    
-    return correspondences, distances
-
-
-def custom_icp(source_pcd, target_pcd, initial_transform=np.eye(4), 
-               max_iterations=50, tolerance=1e-6, 
-               max_correspondence_distance=0.05):
+def custom_icp(source, target, initial_transform, max_iterations=50, 
+               tolerance=1e-6, max_correspondence_distance=0.05):
     """
     Custom ICP implementation using scipy.optimize.least_squares.
     
     Args:
-        source_pcd: Source point cloud
-        target_pcd: Target point cloud
+        source: Source point cloud
+        target: Target point cloud
         initial_transform: Initial 4x4 transformation matrix
         max_iterations: Maximum number of ICP iterations
         tolerance: Convergence tolerance
-        max_correspondence_distance: Maximum distance for correspondences
+        max_correspondence_distance: Maximum distance for correspondence matching
     
     Returns:
-        Final transformation matrix and list of intermediate transformations
+        final_transform: Final transformation matrix
+        trajectory: List of transformations at each iteration
     """
+    # Initialize
     current_transform = initial_transform.copy()
-    source_pcd_transformed = source_pcd
+    trajectory = [current_transform.copy()]
     
-    transformations_history = [current_transform.copy()]
-    errors_history = []
+    # Build KDTree for target
+    target_tree = o3d.geometry.KDTreeFlann(target)
     
-    print(f"\n{'='*60}")
-    print("Starting Custom ICP Algorithm")
-    print(f"{'='*60}")
+    # Get target points and normals
+    target_points = np.asarray(target.points)
+    target_normals = np.asarray(target.normals)
+    
+    print("\n=== Starting Custom ICP ===")
     
     for iteration in range(max_iterations):
-        # Step 1: Find correspondences
-        correspondences, distances = find_correspondences(
-            source_pcd_transformed, target_pcd, max_correspondence_distance
-        )
+        # Transform source point cloud
+        source_transformed = deepcopy(source)
+        source_transformed.transform(current_transform)
+        source_points = np.asarray(source_transformed.points)
+        
+        # Find correspondences
+        correspondences = []
+        source_matched = []
+        target_matched = []
+        target_normals_matched = []
+        
+        for i, point in enumerate(source_points):
+            [k, idx, dist] = target_tree.search_knn_vector_3d(point, 1)
+            if dist[0] < max_correspondence_distance ** 2:
+                correspondences.append((i, idx[0]))
+                source_matched.append(source_points[i])
+                target_matched.append(target_points[idx[0]])
+                target_normals_matched.append(target_normals[idx[0]])
         
         if len(correspondences) < 10:
-            print(f"\nIteration {iteration}: Too few correspondences ({len(correspondences)}). Stopping.")
+            print(f"Iteration {iteration}: Too few correspondences ({len(correspondences)}), stopping.")
             break
         
-        # Extract corresponding points and normals
-        source_indices = [c[0] for c in correspondences]
-        target_indices = [c[1] for c in correspondences]
+        source_matched = np.array(source_matched)
+        target_matched = np.array(target_matched)
+        target_normals_matched = np.array(target_normals_matched)
         
-        source_points = np.asarray(source_pcd_transformed.points)[source_indices]
-        target_points = np.asarray(target_pcd.points)[target_indices]
-        target_normals = np.asarray(target_pcd.normals)[target_indices]
+        # Initial parameters (identity transformation)
+        initial_params = np.zeros(6)
         
-        # Calculate current error
-        current_error = np.mean(distances)
-        errors_history.append(current_error)
-        
-        print(f"\nIteration {iteration + 1}/{max_iterations}")
-        print(f"  Correspondences: {len(correspondences)}")
-        print(f"  Mean error: {current_error:.6f} m")
-        
-        # Step 2: Optimize transformation using least squares
-        initial_params = transformation_matrix_to_vector(np.eye(4))
-        
+        # Optimize using least squares
         result = least_squares(
             point_to_plane_residuals,
             initial_params,
-            args=(source_points, target_points, target_normals),
+            args=(source_matched, target_matched, target_normals_matched),
             method='lm',  # Levenberg-Marquardt
-            verbose=0
+            max_nfev=100
         )
         
         # Get incremental transformation
-        incremental_transform = vector_to_transformation_matrix(result.x)
+        incremental_transform = transform_params_to_matrix(result.x)
         
-        # Step 3: Update transformation
+        # Update current transformation
+        previous_transform = current_transform.copy()
         current_transform = incremental_transform @ current_transform
+        trajectory.append(current_transform.copy())
         
-        # Apply transformation to source point cloud
-        source_pcd_transformed = source_pcd.transform(incremental_transform)
-        
-        transformations_history.append(current_transform.copy())
+        # Calculate RMSE
+        rmse = np.sqrt(np.mean(result.fun ** 2))
         
         # Check convergence
-        if iteration > 0 and abs(errors_history[-1] - errors_history[-2]) < tolerance:
-            print(f"\nConverged at iteration {iteration + 1}")
-            print(f"Error change: {abs(errors_history[-1] - errors_history[-2]):.8f} < {tolerance}")
+        transform_diff = np.linalg.norm(current_transform - previous_transform)
+        
+        print(f"Iteration {iteration}: Correspondences={len(correspondences)}, "
+              f"RMSE={rmse:.6f}, Transform_diff={transform_diff:.6f}")
+        
+        if transform_diff < tolerance:
+            print(f"Converged at iteration {iteration}")
             break
     
-    print(f"\n{'='*60}")
-    print("ICP Algorithm Completed")
-    print(f"{'='*60}")
-    print(f"Final mean error: {errors_history[-1]:.6f} m")
-    print(f"\nFinal Transformation Matrix:")
-    print(current_transform)
+    print("=== ICP Finished ===\n")
     
-    return current_transform, transformations_history, errors_history
+    return current_transform, trajectory
 
 
 def visualize_registration(source, target, transformation, window_name="Registration Result"):
     """
-    Visualize the registration result.
+    Visualize registration result.
     """
-    source_temp = source.transform(transformation)
+    source_temp = deepcopy(source)
+    source_temp.transform(transformation)
     
-    # Color the point clouds
+    # Color point clouds
     source_temp.paint_uniform_color([1, 0, 0])  # Red
     target.paint_uniform_color([0, 0, 1])  # Blue
     
-    # Create coordinate frame
-    axes = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.5)
+    axes_mesh = o3d.geometry.TriangleMesh().create_coordinate_frame(size=0.5)
     
     o3d.visualization.draw_geometries(
-        [source_temp, target, axes],
+        [source_temp, target, axes_mesh],
         window_name=window_name,
-        width=1280,
-        height=720
+        front=view['trajectory'][0]['front'],
+        lookat=view['trajectory'][0]['lookat'],
+        up=view['trajectory'][0]['up'],
+        zoom=view['trajectory'][0]['zoom']
     )
 
 
 def main():
-    print("Custom ICP Implementation with Least-Squares Optimization")
-    print("="*60)
-    
     # Camera intrinsic parameters (PrimeSense default)
     intrinsic = o3d.camera.PinholeCameraIntrinsic(
         o3d.camera.PinholeCameraIntrinsicParameters.PrimeSenseDefault
     )
     
-    # Step 1: Load and filter depth images
-    print("\n1. Loading RGB-D images...")
-    rgb1_o3d, depth1_o3d = load_and_filter_depth(
+    # ------------------------------------
+    # Load and preprocess first point cloud
+    # ------------------------------------
+    print("Loading and preprocessing first point cloud...")
+    rgb1, depth1 = load_and_filter_depth(
         '../tum_dataset/rgb/1.png',
         '../tum_dataset/depth/1.png'
     )
+    pcd1 = create_point_cloud_from_rgbd(rgb1, depth1, intrinsic)
+    pcd1_processed = preprocess_point_cloud(pcd1, voxel_size=0.03)
+    print(f"Point cloud 1: {len(pcd1_processed.points)} points after preprocessing")
     
-    rgb2_o3d, depth2_o3d = load_and_filter_depth(
+    # ------------------------------------
+    # Load and preprocess second point cloud
+    # ------------------------------------
+    print("Loading and preprocessing second point cloud...")
+    rgb2, depth2 = load_and_filter_depth(
         '../tum_dataset/rgb/2.png',
         '../tum_dataset/depth/2.png'
     )
-    print("   ✓ Images loaded successfully")
+    pcd2 = create_point_cloud_from_rgbd(rgb2, depth2, intrinsic)
+    pcd2_processed = preprocess_point_cloud(pcd2, voxel_size=0.03)
+    print(f"Point cloud 2: {len(pcd2_processed.points)} points after preprocessing")
     
-    # Step 2: Create point clouds
-    print("\n2. Creating point clouds...")
-    pcd1 = create_point_cloud(rgb1_o3d, depth1_o3d, intrinsic)
-    pcd2 = create_point_cloud(rgb2_o3d, depth2_o3d, intrinsic)
-    print(f"   ✓ Point cloud 1: {len(pcd1.points)} points")
-    print(f"   ✓ Point cloud 2: {len(pcd2.points)} points")
+    # ------------------------------------
+    # Visualize initial alignment
+    # ------------------------------------
+    print("\nVisualizing initial alignment (before ICP)...")
+    pcd1_vis = deepcopy(pcd1_processed)
+    pcd2_vis = deepcopy(pcd2_processed)
+    pcd1_vis.paint_uniform_color([1, 0, 0])  # Red
+    pcd2_vis.paint_uniform_color([0, 0, 1])  # Blue
     
-    # Step 3: Preprocess point clouds
-    print("\n3. Preprocessing point clouds...")
-    voxel_size = 0.03
-    pcd1_processed = preprocess_point_cloud(pcd1, voxel_size)
-    pcd2_processed = preprocess_point_cloud(pcd2, voxel_size)
-    print(f"   ✓ Downsampled point cloud 1: {len(pcd1_processed.points)} points")
-    print(f"   ✓ Downsampled point cloud 2: {len(pcd2_processed.points)} points")
-    print(f"   ✓ Normals estimated")
+    axes_mesh = o3d.geometry.TriangleMesh().create_coordinate_frame(size=0.5)
+    o3d.visualization.draw_geometries(
+        [pcd1_vis, pcd2_vis, axes_mesh],
+        window_name="Initial Alignment (Before ICP)",
+        front=view['trajectory'][0]['front'],
+        lookat=view['trajectory'][0]['lookat'],
+        up=view['trajectory'][0]['up'],
+        zoom=view['trajectory'][0]['zoom']
+    )
     
-    # Manual initial transformation (example: small translation and rotation)
-    # You can adjust these values based on your data
-    print("\n4. Setting initial transformation...")
-    initial_transform = np.eye(4)
-    # Example: translate by [0.1, 0.05, 0.2] and rotate slightly
-    initial_transform[:3, 3] = [0.1, 0.05, 0.2]
-    rotation = Rotation.from_euler('xyz', [5, 10, 5], degrees=True)
-    initial_transform[:3, :3] = rotation.as_matrix()
+    # ------------------------------------
+    # Manual initial transformation
+    # ------------------------------------
+    # You can adjust these values based on visual inspection
+    # Format: 4x4 transformation matrix
+    initial_transform = np.array([
+        [1.0, 0.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0, 0.0],
+        [0.0, 0.0, 0.0, 1.0]
+    ])
     
-    print("   Initial transformation matrix:")
+    # Alternative: You can provide a rough initial guess
+    # For example, if you know there's a small rotation and translation:
+    # initial_transform = np.array([
+    #     [0.99, -0.1, 0.0, 0.1],
+    #     [0.1, 0.99, 0.0, 0.0],
+    #     [0.0, 0.0, 1.0, 0.0],
+    #     [0.0, 0.0, 0.0, 1.0]
+    # ])
+    
+    print("\nInitial transformation matrix:")
     print(initial_transform)
     
-    # Visualize before ICP
-    print("\n5. Visualizing initial alignment...")
-    visualize_registration(pcd1_processed, pcd2_processed, 
-                          initial_transform, 
-                          "Before ICP - Initial Alignment")
-    
-    # Step 4: Run custom ICP
-    print("\n6. Running Custom ICP...")
-    final_transform, transform_history, errors = custom_icp(
-        pcd1_processed,
-        pcd2_processed,
+    # ------------------------------------
+    # Run custom ICP
+    # ------------------------------------
+    final_transform, trajectory = custom_icp(
+        source=pcd1_processed,
+        target=pcd2_processed,
         initial_transform=initial_transform,
         max_iterations=50,
         tolerance=1e-6,
         max_correspondence_distance=0.05
     )
     
-    # Visualize after ICP
-    print("\n7. Visualizing final alignment...")
-    visualize_registration(pcd1_processed, pcd2_processed, 
-                          final_transform, 
-                          "After ICP - Final Alignment")
+    print("\nFinal transformation matrix:")
+    print(final_transform)
     
-    # Plot error evolution
-    print("\n8. Generating error plot...")
-    import matplotlib.pyplot as plt
+    # ------------------------------------
+    # Visualize final result
+    # ------------------------------------
+    print("\nVisualizing final alignment (after ICP)...")
+    visualize_registration(
+        pcd1_processed,
+        pcd2_processed,
+        final_transform,
+        window_name="Final Alignment (After Custom ICP)"
+    )
     
-    plt.figure(figsize=(10, 6))
-    plt.plot(range(1, len(errors) + 1), errors, 'b-o', linewidth=2, markersize=6)
-    plt.xlabel('Iteration', fontsize=12)
-    plt.ylabel('Mean Error (m)', fontsize=12)
-    plt.title('ICP Convergence', fontsize=14, fontweight='bold')
-    plt.grid(True, alpha=0.3)
-    plt.tight_layout()
-    plt.show()
+    # ------------------------------------
+    # Compare with Open3D's ICP
+    # ------------------------------------
+    print("\nRunning Open3D's ICP for comparison...")
+    reg_p2p = o3d.pipelines.registration.registration_icp(
+        pcd1_processed, pcd2_processed, 0.05, initial_transform,
+        o3d.pipelines.registration.TransformationEstimationPointToPlane()
+    )
     
-    print("\n" + "="*60)
-    print("Process completed successfully!")
-    print("="*60)
+    print("Open3D ICP transformation:")
+    print(reg_p2p.transformation)
+    print(f"Open3D ICP fitness: {reg_p2p.fitness}")
+    print(f"Open3D ICP RMSE: {reg_p2p.inlier_rmse}")
+    
+    print("\nVisualizing Open3D ICP result...")
+    visualize_registration(
+        pcd1_processed,
+        pcd2_processed,
+        reg_p2p.transformation,
+        window_name="Open3D ICP Result (for comparison)"
+    )
 
 
 if __name__ == '__main__':
