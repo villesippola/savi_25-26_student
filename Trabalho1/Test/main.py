@@ -346,6 +346,39 @@ def main():
     print(f"Point cloud 2: {len(pcd2_processed.points)} points after preprocessing")
     
     # ------------------------------------
+    # Artificially perturb point cloud for testing (OPTIONAL)
+    # ------------------------------------
+    # Uncomment the lines below to test RANSAC robustness
+    TEST_MODE = True  # Set to True to test with artificial perturbation
+    
+    if TEST_MODE:
+        print("\n=== TEST MODE: Applying artificial perturbation ===")
+        # Define a large perturbation transformation
+        # You can adjust these values to make alignment harder/easier
+        perturbation = np.array([
+            [0.5,   -0.866, 0.0,   2.0],   # 60° rotation + 2m translation
+            [0.866,  0.5,   0.0,   1.5],
+            [0.0,    0.0,   1.0,   1.0],
+            [0.0,    0.0,   0.0,   1.0]
+        ])
+        
+        # Alternative: Random perturbation
+        # angle = np.radians(45)  # 45 degree rotation
+        # perturbation = np.array([
+        #     [np.cos(angle), -np.sin(angle), 0.0, 0.8],
+        #     [np.sin(angle),  np.cos(angle), 0.0, 0.5],
+        #     [0.0,            0.0,           1.0, 0.3],
+        #     [0.0,            0.0,           0.0, 1.0]
+        # ])
+        
+        print("Perturbation matrix:")
+        print(perturbation)
+        
+        # Apply perturbation to first point cloud
+        pcd1_processed.transform(perturbation)
+        print("Applied perturbation to point cloud 1")
+
+    # ------------------------------------
     # Visualize initial alignment
     # ------------------------------------
     print("\nVisualizing initial alignment (before ICP)...")
