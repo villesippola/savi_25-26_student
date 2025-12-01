@@ -20,7 +20,7 @@ def main():
     parser = argparse.ArgumentParser()
 
     parser.add_argument('-df', '--dataset_folder', type=str,
-                        default='/home/mike/data/savi_datasets/mnist')
+                        default='/home/ville/data/savi_datasets/mnist')
 
     args = vars(parser.parse_args())
     print(args)
