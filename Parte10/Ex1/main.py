@@ -24,7 +24,7 @@ def main():
     parser = argparse.ArgumentParser()
 
     parser.add_argument('-df', '--dataset_folder', type=str,
-                        default='/home/mike/data/savi_datasets/mnist')
+                        default='/home/ville/data/savi_datasets/mnist')
     parser.add_argument('-pe', '--percentage_examples', type=float, default=0.2,
                         help='Percentage of examples to use for training and testing')
     parser.add_argument('-ne', '--num_epochs', type=int, default=10,
