@@ -15,7 +15,7 @@ import torch
 from dataset import Dataset
 
 from torchvision import transforms
-from model import ModelFullyconnected, ModelConvNet, ModelConvNet3
+from model import ModelFullyconnected, ModelConvNet, ModelConvNet3, ModelBetterCNN
 from trainer import Trainer
 from datetime import datetime
 
@@ -34,9 +34,9 @@ def main():
 
     parser.add_argument('-df', '--dataset_folder', type=str,
                         default='/home/ville/data/savi_datasets/mnist')
-    parser.add_argument('-pe', '--percentage_examples', type=float, default=0.2,
+    parser.add_argument('-pe', '--percentage_examples', type=float, default=1.0,
                         help='Percentage of examples to use for training and testing')
-    parser.add_argument('-ne', '--num_epochs', type=int, default=10,
+    parser.add_argument('-ne', '--num_epochs', type=int, default=20,  # Increased from 10
                         help='Number of epochs for training')
     parser.add_argument('-bs', '--batch_size', type=int, default=64,
                         help='Batch size for training and testing.')
@@ -83,8 +83,9 @@ def main():
     # Create the model
     # ------------------------------------
     # model = ModelFullyconnected()
-    model = ModelConvNet()
+    # model = ModelConvNet()
     # model = ModelConvNet3()
+    model = ModelBetterCNN()  # Use the improved model
 
     # ------------------------------------
     # Start trainin
@@ -92,10 +93,10 @@ def main():
     trainer = Trainer(args, train_dataset, test_dataset, model)
 
     # call getitem for an idx and print the resutl
-    image_tensor, label_gt_tensor = trainer.train_dataloader.dataset.__getitem__(
-        107)  # type: ignore
-    label_pred_tensor = model.forward(image_tensor)
-
+    # image_tensor, label_gt_tensor = trainer.train_dataloader.dataset.__getitem__(
+    #     107)  # type: ignore
+    # label_pred_tensor = model.forward(image_tensor)
+    
     trainer.train()  # run training
 
     trainer.evaluate()  # run evaluation

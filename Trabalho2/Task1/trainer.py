@@ -14,6 +14,7 @@ from torch.utils.data import DataLoader
 import torch.nn as nn
 import json
 from tqdm import tqdm
+from sklearn.metrics import precision_recall_fscore_support, accuracy_score
 
 
 class Trainer():
@@ -282,20 +283,43 @@ class Trainer():
         # -----------------------------------------
         # Compute TPs, FPs, TNs, FNs for each class
         # -----------------------------------------
+        # Compute metrics per class
+        precision_per_class, recall_per_class, f1_per_class, _ = \
+            precision_recall_fscore_support(gt_classes, predicted_classes, 
+                                        labels=range(10), zero_division=0)
+        
+        # Compute macro averages
+        precision_macro, recall_macro, f1_macro, _ = \
+            precision_recall_fscore_support(gt_classes, predicted_classes, 
+                                        average='macro', zero_division=0)
+        
+        # Compute overall accuracy
+        accuracy = accuracy_score(gt_classes, predicted_classes)
+        
+        # Update statistics dictionary
         statistics = {}
-
         for i in range(10):
-
-            TPs = int(confusion_matrix[i][i])
-            FPs = int(sum(confusion_matrix[:, i]) - TPs)
-            FNs = int(sum(confusion_matrix[i, :]) - TPs)
-            precision, recall = self.getPrecisionRecall(TPs, FPs, FNs)
-
-            d = {'digit': i, 'TPs': TPs, 'FPs': FPs, 'FNs': FNs,
-                 'precision': precision, 'recall': recall}
+            d = {
+                'digit': i,
+                'precision': float(precision_per_class[i]),
+                'recall': float(recall_per_class[i]),
+                'f1_score': float(f1_per_class[i])
+            }
             statistics[i] = d
-
-        print('Statistics per class: ' + str(statistics))
+        
+        # Add overall metrics
+        statistics['overall'] = {
+            'accuracy': float(accuracy),
+            'precision_macro': float(precision_macro),
+            'recall_macro': float(recall_macro),
+            'f1_macro': float(f1_macro)
+        }
+        
+        print('\nOverall Metrics:')
+        print(f'Accuracy: {accuracy:.4f}')
+        print(f'Macro Precision: {precision_macro:.4f}')
+        print(f'Macro Recall: {recall_macro:.4f}')
+        print(f'Macro F1-Score: {f1_macro:.4f}')
 
         # -----------------------------------------
         # Write the dictionary to a json file
