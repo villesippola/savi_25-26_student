@@ -98,6 +98,7 @@ def generate_dataset(dirpath: pathlib.Path,
                      min_digit_size: int,
                      imsize: int,
                      max_digits_per_image: int,
+                     min_digits_per_image: int, # The new parameter
                      mnist_images: np.ndarray,
                      mnist_labels: np.ndarray):
     if dataset_exists(dirpath, num_images):
@@ -112,7 +113,7 @@ def generate_dataset(dirpath: pathlib.Path,
         im = np.zeros((imsize, imsize), dtype=np.float32)
         labels = []
         bboxes = []
-        num_images = np.random.randint(0, max_digits_per_image)
+        num_images = np.random.randint(min_digits_per_image, max_digits_per_image)
         for _ in range(num_images+1):
             while True:
                 width = np.random.randint(min_digit_size, max_digit_size)
@@ -167,7 +168,10 @@ if __name__ == "__main__":
         "--num-test-images", default=10000, type=int
     )
     parser.add_argument(
-        "--max-digits-per-image", default=5, type=int
+        "--max-digits-per-image", default=4, type=int
+    )
+    parser.add_argument(
+        "--min-digits-per-image", default=0, type=int  # New argument
     )
     args = parser.parse_args()
     X_train, Y_train, X_test, Y_test = mnist.load()
@@ -180,5 +184,6 @@ if __name__ == "__main__":
             args.min_digit_size,
             args.imsize,
             args.max_digits_per_image,
+            args.min_digits_per_image, # The new argument
             X,
             Y) 
