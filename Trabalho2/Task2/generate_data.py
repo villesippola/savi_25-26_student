@@ -152,7 +152,7 @@ if __name__ == "__main__":
         "--base-path", default="/home/ville/data/savi_datasets/own_dataset/mnist_detection"
     )
     parser.add_argument(
-        "--imsize", default=300, type=int
+        "--imsize", default=128, type=int  #e.g., 100x100 or 128x128
     )
     parser.add_argument(
         "--max-digit-size", default=37, type=int
@@ -161,13 +161,13 @@ if __name__ == "__main__":
         "--min-digit-size", default=22, type=int
     )
     parser.add_argument(
-        "--num-train-images", default=10000, type=int
+        "--num-train-images", default=60000, type=int
     )
     parser.add_argument(
-        "--num-test-images", default=1000, type=int
+        "--num-test-images", default=10000, type=int
     )
     parser.add_argument(
-        "--max-digits-per-image", default=20, type=int
+        "--max-digits-per-image", default=5, type=int
     )
     args = parser.parse_args()
     X_train, Y_train, X_test, Y_test = mnist.load()
