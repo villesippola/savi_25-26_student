@@ -1,0 +1,40 @@
+{
+    "dataset_info": {
+        "total_images": 60000,
+        "total_digits": 239909,
+        "avg_digits_per_image": 3.998483333333333,
+        "std_digits_per_image": 0.8156884820335655,
+        "min_digits_per_image": 3,
+        "max_digits_per_image": 5
+    },
+    "class_distribution": {
+        "0": 23660,
+        "1": 26829,
+        "2": 23946,
+        "3": 24600,
+        "4": 23371,
+        "5": 21684,
+        "6": 23367,
+        "7": 25207,
+        "8": 23403,
+        "9": 23842
+    },
+    "digit_size": {
+        "avg_width": 17.009345210058815,
+        "std_width": 4.792405040935431,
+        "min_width": 2,
+        "max_width": 27,
+        "avg_height": 21.14858550533744,
+        "std_height": 3.3602590950073603,
+        "min_height": 8,
+        "max_height": 27,
+        "avg_area": 366.87926255371826,
+        "std_area": 140.7126423937349
+    },
+    "aspect_ratio": {
+        "mean": 0.8097386974454236,
+        "std": 0.21248175652585607,
+        "min": 0.1,
+        "max": 2.25
+    }
+}
