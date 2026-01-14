@@ -119,7 +119,8 @@ def generate_dataset(dirpath: pathlib.Path,
                 x0 = np.random.randint(0, imsize-width)
                 y0 = np.random.randint(0, imsize-width)
                 ious = compute_iou_all([x0, y0, x0+width, y0+width], bboxes)
-                if max(ious) < 0.25:
+                # Stricter overlap prevention: no overlap at all (IOU = 0)
+                if max(ious) == 0.0:
                     break
             digit_idx = np.random.randint(0, len(mnist_images))
             digit = mnist_images[digit_idx].astype(np.float32)
@@ -148,7 +149,7 @@ def generate_dataset(dirpath: pathlib.Path,
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--base-path", default="data/mnist_detection"
+        "--base-path", default="/home/ville/data/savi_datasets/own_dataset/mnist_detection"
     )
     parser.add_argument(
         "--imsize", default=300, type=int

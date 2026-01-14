@@ -13,7 +13,7 @@ filename = [
     ["training_labels", "train-labels-idx1-ubyte.gz"],
     ["test_labels", "t10k-labels-idx1-ubyte.gz"]
 ]
-SAVE_PATH = pathlib.Path("data/original_mnist")
+SAVE_PATH = pathlib.Path("/home/ville/data/savi_datasets/own_dataset/original_mnist")
 
 
 def download_mnist():
