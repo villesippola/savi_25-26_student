@@ -36,7 +36,7 @@ def main():
                         default='/home/ville/data/savi_datasets/mnist')
     parser.add_argument('-pe', '--percentage_examples', type=float, default=1.0,
                         help='Percentage of examples to use for training and testing')
-    parser.add_argument('-ne', '--num_epochs', type=int, default=20,  # Increased from 10
+    parser.add_argument('-ne', '--num_epochs', type=int, default=10,
                         help='Number of epochs for training')
     parser.add_argument('-bs', '--batch_size', type=int, default=64,
                         help='Batch size for training and testing.')
