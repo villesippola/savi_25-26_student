@@ -130,7 +130,8 @@ def generate_dataset(dirpath: pathlib.Path,
             labels.append(label)
             assert im[y0:y0+width, x0:x0+width].shape == digit.shape, \
                 f"imshape: {im[y0:y0+width, x0:x0+width].shape}, digit shape: {digit.shape}"
-            bbox = tight_bbox(digit, [x0, y0, x0+width, y0+width])
+            # bbox = tight_bbox(digit, [x0, y0, x0+width, y0+width])
+            bbox = [x0, y0, x0+width, y0+width]
             bboxes.append(bbox)
 
             im[y0:y0+width, x0:x0+width] += digit

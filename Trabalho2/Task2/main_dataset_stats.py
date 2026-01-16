@@ -54,10 +54,7 @@ def compute_statistics(base_path: pathlib.Path):
     # Initialize counters
     all_labels = []
     digits_per_image = []
-    digit_widths = []
-    digit_heights = []
-    digit_areas = []
-    digit_aspect_ratios = []
+    digit_sizes = []
     
     print(f"Computing statistics for {len(impaths)} images...")
     
@@ -75,23 +72,14 @@ def compute_statistics(base_path: pathlib.Path):
         # Compute bbox statistics
         for bbox in bboxes_XYXY:
             xmin, ymin, xmax, ymax = bbox
-            width = xmax - xmin
-            height = ymax - ymin
-            area = width * height
-            aspect_ratio = width / height if height > 0 else 0
+            size = xmax - xmin
             
-            digit_widths.append(width)
-            digit_heights.append(height)
-            digit_areas.append(area)
-            digit_aspect_ratios.append(aspect_ratio)
+            digit_sizes.append(size)
     
     # Convert to numpy arrays
     all_labels = np.array(all_labels)
     digits_per_image = np.array(digits_per_image)
-    digit_widths = np.array(digit_widths)
-    digit_heights = np.array(digit_heights)
-    digit_areas = np.array(digit_areas)
-    digit_aspect_ratios = np.array(digit_aspect_ratios)
+    digit_sizes = np.array(digit_sizes)
     
     # Compute statistics
     stats = {
@@ -107,22 +95,10 @@ def compute_statistics(base_path: pathlib.Path):
             int(i): int((all_labels == i).sum()) for i in range(10)
         },
         'digit_size': {
-            'avg_width': float(np.mean(digit_widths)),
-            'std_width': float(np.std(digit_widths)),
-            'min_width': int(np.min(digit_widths)),
-            'max_width': int(np.max(digit_widths)),
-            'avg_height': float(np.mean(digit_heights)),
-            'std_height': float(np.std(digit_heights)),
-            'min_height': int(np.min(digit_heights)),
-            'max_height': int(np.max(digit_heights)),
-            'avg_area': float(np.mean(digit_areas)),
-            'std_area': float(np.std(digit_areas)),
-        },
-        'aspect_ratio': {
-            'mean': float(np.mean(digit_aspect_ratios)),
-            'std': float(np.std(digit_aspect_ratios)),
-            'min': float(np.min(digit_aspect_ratios)),
-            'max': float(np.max(digit_aspect_ratios)),
+            'avg_size': float(np.mean(digit_sizes)),
+            'std_size': float(np.std(digit_sizes)),
+            'min_size': int(np.min(digit_sizes)),
+            'max_size': int(np.max(digit_sizes)),
         }
     }
     
@@ -130,10 +106,7 @@ def compute_statistics(base_path: pathlib.Path):
     stats['_raw_data'] = {
         'all_labels': all_labels,
         'digits_per_image': digits_per_image,
-        'digit_widths': digit_widths,
-        'digit_heights': digit_heights,
-        'digit_areas': digit_areas,
-        'digit_aspect_ratios': digit_aspect_ratios,
+        'digit_sizes': digit_sizes,
     }
     
     return stats
@@ -157,19 +130,6 @@ def print_statistics(stats: dict):
         percentage = (count / stats['dataset_info']['total_digits']) * 100
         bar = "█" * int(percentage / 2)
         print(f"  Digit {digit}: {count:5d} ({percentage:5.2f}%) {bar}")
-    
-    print("\n📏 Digit Size Statistics:")
-    print(f"  Width:  {stats['digit_size']['avg_width']:.2f} ± {stats['digit_size']['std_width']:.2f} pixels "
-          f"[{stats['digit_size']['min_width']}, {stats['digit_size']['max_width']}]")
-    print(f"  Height: {stats['digit_size']['avg_height']:.2f} ± {stats['digit_size']['std_height']:.2f} pixels "
-          f"[{stats['digit_size']['min_height']}, {stats['digit_size']['max_height']}]")
-    print(f"  Area:   {stats['digit_size']['avg_area']:.2f} ± {stats['digit_size']['std_area']:.2f} pixels²")
-    
-    print("\n📐 Aspect Ratio:")
-    print(f"  Mean: {stats['aspect_ratio']['mean']:.3f} ± {stats['aspect_ratio']['std']:.3f}")
-    print(f"  Range: [{stats['aspect_ratio']['min']:.3f}, {stats['aspect_ratio']['max']:.3f}]")
-    
-    print("\n" + "="*70)
 
 
 def plot_statistics(stats: dict, save_path: str = "statistics.png"):
@@ -217,98 +177,16 @@ def plot_statistics(stats: dict, save_path: str = "statistics.png"):
     for x, y in zip(unique, counts):
         ax2.text(x, y, str(y), ha='center', va='bottom', fontsize=10)
     
-    # 3. Digit Width Distribution
+    # 3. Digit Size Distribution
     ax3 = plt.subplot(2, 4, 3)
-    ax3.hist(raw['digit_widths'], bins=30, color='green', alpha=0.7, edgecolor='black')
-    ax3.axvline(stats['digit_size']['avg_width'], color='red', linestyle='--', linewidth=2, 
-                label=f"Mean: {stats['digit_size']['avg_width']:.1f}")
-    ax3.set_xlabel('Width (pixels)', fontsize=12)
+    ax3.hist(raw['digit_sizes'], bins=30, color='green', alpha=0.7, edgecolor='black')
+    ax3.axvline(stats['digit_size']['avg_size'], color='red', linestyle='--', linewidth=2,
+                label=f"Mean: {stats['digit_size']['avg_size']:.1f}")
+    ax3.set_xlabel('Size (pixels)', fontsize=12)
     ax3.set_ylabel('Frequency', fontsize=12)
-    ax3.set_title('Digit Width Distribution', fontsize=14, fontweight='bold')
+    ax3.set_title('Digit Size Distribution', fontsize=14, fontweight='bold')
     ax3.legend()
     ax3.grid(axis='y', alpha=0.3)
-    
-    # 4. Digit Height Distribution
-    ax4 = plt.subplot(2, 4, 4)
-    ax4.hist(raw['digit_heights'], bins=30, color='orange', alpha=0.7, edgecolor='black')
-    ax4.axvline(stats['digit_size']['avg_height'], color='red', linestyle='--', linewidth=2,
-                label=f"Mean: {stats['digit_size']['avg_height']:.1f}")
-    ax4.set_xlabel('Height (pixels)', fontsize=12)
-    ax4.set_ylabel('Frequency', fontsize=12)
-    ax4.set_title('Digit Height Distribution', fontsize=14, fontweight='bold')
-    ax4.legend()
-    ax4.grid(axis='y', alpha=0.3)
-    
-    # 5. Digit Area Distribution
-    ax5 = plt.subplot(2, 4, 5)
-    ax5.hist(raw['digit_areas'], bins=30, color='purple', alpha=0.7, edgecolor='black')
-    ax5.axvline(stats['digit_size']['avg_area'], color='red', linestyle='--', linewidth=2,
-                label=f"Mean: {stats['digit_size']['avg_area']:.1f}")
-    ax5.set_xlabel('Area (pixels²)', fontsize=12)
-    ax5.set_ylabel('Frequency', fontsize=12)
-    ax5.set_title('Digit Area Distribution', fontsize=14, fontweight='bold')
-    ax5.legend()
-    ax5.grid(axis='y', alpha=0.3)
-    
-    # 6. Aspect Ratio Distribution
-    ax6 = plt.subplot(2, 4, 6)
-    ax6.hist(raw['digit_aspect_ratios'], bins=30, color='coral', alpha=0.7, edgecolor='black')
-    ax6.axvline(stats['aspect_ratio']['mean'], color='red', linestyle='--', linewidth=2,
-                label=f"Mean: {stats['aspect_ratio']['mean']:.2f}")
-    ax6.set_xlabel('Aspect Ratio (width/height)', fontsize=12)
-    ax6.set_ylabel('Frequency', fontsize=12)
-    ax6.set_title('Aspect Ratio Distribution', fontsize=14, fontweight='bold')
-    ax6.legend()
-    ax6.grid(axis='y', alpha=0.3)
-    
-    # 7. Class Distribution (Pie Chart)
-    ax7 = plt.subplot(2, 4, 7)
-    # Use the same data as bar chart to ensure consistency
-    pie_colors = colors[:10]
-    if sum(digit_counts) > 0:
-        wedges, texts, autotexts = ax7.pie(digit_counts, labels=digit_labels, 
-                                             colors=pie_colors, autopct='%1.1f%%', 
-                                             startangle=90)
-        # Make percentage text more readable
-        for autotext in autotexts:
-            autotext.set_color('white')
-            autotext.set_fontweight('bold')
-            autotext.set_fontsize(10)
-    ax7.set_title('Class Distribution (Pie)', fontsize=14, fontweight='bold')
-    
-    # 8. Summary Statistics Table
-    ax8 = plt.subplot(2, 4, 8)
-    ax8.axis('off')
-    
-    summary_data = [
-        ['Metric', 'Value'],
-        ['Total Images', f"{stats['dataset_info']['total_images']:,}"],
-        ['Total Digits', f"{stats['dataset_info']['total_digits']:,}"],
-        ['Avg Digits/Image', f"{stats['dataset_info']['avg_digits_per_image']:.2f}"],
-        ['Avg Width', f"{stats['digit_size']['avg_width']:.1f} px"],
-        ['Avg Height', f"{stats['digit_size']['avg_height']:.1f} px"],
-        ['Avg Area', f"{stats['digit_size']['avg_area']:.1f} px²"],
-        ['Avg Aspect Ratio', f"{stats['aspect_ratio']['mean']:.3f}"],
-    ]
-    
-    table = ax8.table(cellText=summary_data, cellLoc='left', loc='center',
-                     colWidths=[0.6, 0.4])
-    table.auto_set_font_size(False)
-    table.set_fontsize(11)
-    table.scale(1, 2.5)
-    
-    # Style header row
-    for i in range(2):
-        table[(0, i)].set_facecolor('#4CAF50')
-        table[(0, i)].set_text_props(weight='bold', color='white')
-    
-    # Alternate row colors
-    for i in range(1, len(summary_data)):
-        for j in range(2):
-            if i % 2 == 0:
-                table[(i, j)].set_facecolor('#f0f0f0')
-    
-    ax8.set_title('Summary Statistics', fontsize=14, fontweight='bold', pad=20)
     
     plt.tight_layout()
     plt.savefig(save_path, dpi=300, bbox_inches='tight')
