@@ -1,4 +1,3 @@
-
 from torchinfo import summary
 import torch.nn as nn
 
@@ -256,3 +255,49 @@ class ModelBetterCNN(nn.Module):
     
     def getNumberOfParameters(self):
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
+    
+
+class ModelTask4(nn.Module):
+    """
+    Improved CNN architecture for Object Detection.
+    It includes an 11th class for the 'Background'.
+    """
+    def __init__(self):
+        super(ModelTask4, self).__init__()
+        
+        # Block 1
+        self.conv1 = nn.Conv2d(1, 32, kernel_size=3, padding=1)
+        self.bn1 = nn.BatchNorm2d(32)
+        self.relu1 = nn.ReLU()
+        self.pool1 = nn.MaxPool2d(2, 2)
+        
+        # Block 2
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
+        self.bn2 = nn.BatchNorm2d(64)
+        self.relu2 = nn.ReLU()
+        self.pool2 = nn.MaxPool2d(2, 2)
+        
+        # Block 3
+        self.conv3 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
+        self.bn3 = nn.BatchNorm2d(128)
+        self.relu3 = nn.ReLU()
+        
+        # Fully Connected Layers
+        self.fc1 = nn.Linear(128 * 7 * 7, 256)
+        self.relu4 = nn.ReLU()
+        self.dropout = nn.Dropout(0.5)
+        
+        # --- CRITICAL CHANGE FOR TASK 4 ---
+        # We now have 11 outputs (0-9 are digits, 10 is Background)
+        self.fc2 = nn.Linear(256, 11) 
+        
+        print('ModelTask4 initialized (11 classes including Background).')
+
+    def forward(self, x):
+        x = self.pool1(self.relu1(self.bn1(self.conv1(x))))
+        x = self.pool2(self.relu2(self.bn2(self.conv2(x))))
+        x = self.relu3(self.bn3(self.conv3(x)))
+        x = x.view(-1, 128 * 7 * 7)
+        x = self.dropout(self.relu4(self.fc1(x)))
+        y = self.fc2(x)
+        return y

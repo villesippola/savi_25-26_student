@@ -1,0 +1,126 @@
+#!/usr/bin/env python3
+import sys
+import os
+import cv2
+import torch
+import glob
+import numpy as np
+from torchvision import transforms
+
+# ---------------------------------------------------------
+# MODEL IMPORT
+# ---------------------------------------------------------
+# Try to import ModelTask4 from the current directory, 
+# otherwise fallback to Task1 directory.
+try:
+    from model import ModelTask4
+except ImportError:
+    sys.path.append('../Task1')
+    from model import ModelTask4
+
+def main():
+    # -------------------------------------------------------
+    # 1. CONFIGURATION
+    # -------------------------------------------------------
+    model_path = 'best_task4.pkl'  # Path to the trained weights (Task 4)
+    
+    # Dataset path (Using Version D for multiple digits/random scale)
+    images_path = '../task2_datasets/mnist_detection_vD/test/images/*.png' 
+    
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}")
+
+    # -------------------------------------------------------
+    # 2. LOAD IMPROVED MODEL (TASK 4)
+    # -------------------------------------------------------
+    if not os.path.exists(model_path):
+        print(f"ERROR: File {model_path} not found. Did you run train_task4.py?")
+        return
+
+    # Initialize architecture with 11 classes (0-9 Digits + 10 Background)
+    model = ModelTask4().to(device)
+    
+    # Load weights (map_location ensures CPU/GPU compatibility)
+    checkpoint = torch.load(model_path, map_location=device, weights_only=False)
+    model.load_state_dict(checkpoint['model_state_dict'])
+    model.eval()
+    print("✅ Task 4 Model loaded successfully.")
+
+    # -------------------------------------------------------
+    # 3. TRANSFORMS
+    # -------------------------------------------------------
+    # Standard transformation to convert PIL images to Tensors
+    transform = transforms.Compose([transforms.ToTensor()])
+
+    # -------------------------------------------------------
+    # 4. SLIDING WINDOW WITH BACKGROUND FILTERING
+    # -------------------------------------------------------
+    image_files = glob.glob(images_path)
+    image_files.sort()
+
+    print("Press any key for next image, 'q' to quit.")
+
+    for img_file in image_files:
+        print(f"Processing: {os.path.basename(img_file)}")
+        
+        # Read image in grayscale
+        original_image = cv2.imread(img_file, 0)
+        # Convert to BGR for visualization (drawing colored boxes)
+        output_image = cv2.cvtColor(original_image, cv2.COLOR_GRAY2BGR)
+
+        h, w = original_image.shape
+        window_size = 28
+        step_size = 6  # Stride
+
+        # Iterate over the image
+        for y in range(0, h - window_size + 1, step_size):
+            for x in range(0, w - window_size + 1, step_size):
+                
+                # Extract window
+                window = original_image[y:y+window_size, x:x+window_size]
+                
+                # Convert to PIL and then to Tensor for the model
+                from PIL import Image
+                window_pil = Image.fromarray(window)
+                window_tensor = transform(window_pil).unsqueeze(0).to(device)
+
+                # Inference
+                with torch.no_grad():
+                    output = model(window_tensor)
+                    probabilities = torch.softmax(output, dim=1)
+                
+                score, predicted_class = torch.max(probabilities, 1)
+                score = score.item()
+                predicted_class = predicted_class.item()
+
+                # --- KEY IMPROVEMENT (TASK 4 LOGIC) ---
+                # 1. High confidence threshold (> 0.95)
+                # 2. Filter out Class 10 (Background/Void)
+                if score > 0.95 and predicted_class != 10:
+                    
+                    # Draw box only if it's a valid digit (0-9)
+                    cv2.rectangle(output_image, (x, y), (x + window_size, y + window_size), (0, 255, 0), 1)
+                    cv2.putText(output_image, str(predicted_class), (x, y-5), 
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+
+        # ---------------------------------------------------------
+        # VISUALIZATION
+        # ---------------------------------------------------------
+        # Resize image for better visibility on screen
+        scale = 5
+        large_image = cv2.resize(output_image, (w * scale, h * scale), interpolation=cv2.INTER_NEAREST)
+        
+        cv2.imshow("Task 4: Improved Detection", large_image)
+        
+        # Save result (optional, useful for report)
+        filename = os.path.basename(img_file)
+        cv2.imwrite(f"resultado_t4_{filename}", large_image)
+
+        key = cv2.waitKey(0)
+        if key == ord('q'):
+            break
+
+    cv2.destroyAllWindows()
+
+if __name__ == '__main__':
+    main()
