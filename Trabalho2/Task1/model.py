@@ -80,31 +80,31 @@ class ModelConvNet(nn.Module):
 
     def forward(self, x):
 
-        print('Forward method called ...')
+        # print('Forward method called ...')
 
-        print('Input x.shape = ' + str(x.shape))
+        # print('Input x.shape = ' + str(x.shape))
 
         x = self.conv1(x)
-        print('After conv1 x.shape = ' + str(x.shape))
+        # print('After conv1 x.shape = ' + str(x.shape))
 
         x = self.pool1(x)
-        print('After pool1 x.shape = ' + str(x.shape))
+        # print('After pool1 x.shape = ' + str(x.shape))
 
         x = self.conv2(x)
-        print('After conv2 x.shape = ' + str(x.shape))
+        # print('After conv2 x.shape = ' + str(x.shape))
 
         x = self.pool2(x)
-        print('After pool2 x.shape = ' + str(x.shape))
+        # print('After pool2 x.shape = ' + str(x.shape))
 
         # Transform to latent vector
         x = x.view(-1, 64*7*7)
-        print('After flattening x.shape = ' + str(x.shape))
+        # print('After flattening x.shape = ' + str(x.shape))
 
         x = self.fc1(x)
-        print('After fc1 x.shape = ' + str(x.shape))
+        # print('After fc1 x.shape = ' + str(x.shape))
 
         y = self.fc2(x)
-        print('Output y.shape = ' + str(y.shape))
+        # print('Output y.shape = ' + str(y.shape))
 
         return y
 

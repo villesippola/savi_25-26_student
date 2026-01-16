@@ -54,7 +54,9 @@ def compute_statistics(base_path: pathlib.Path):
     # Initialize counters
     all_labels = []
     digits_per_image = []
-    digit_sizes = []
+    digit_widths = []
+    digit_heights = []
+    digit_areas = []
     
     print(f"Computing statistics for {len(impaths)} images...")
     
@@ -72,14 +74,20 @@ def compute_statistics(base_path: pathlib.Path):
         # Compute bbox statistics
         for bbox in bboxes_XYXY:
             xmin, ymin, xmax, ymax = bbox
-            size = xmax - xmin
+            width = xmax - xmin
+            height = ymax - ymin
+            area = width * height
             
-            digit_sizes.append(size)
+            digit_widths.append(width)
+            digit_heights.append(height)
+            digit_areas.append(area)
     
     # Convert to numpy arrays
     all_labels = np.array(all_labels)
     digits_per_image = np.array(digits_per_image)
-    digit_sizes = np.array(digit_sizes)
+    digit_widths = np.array(digit_widths)
+    digit_heights = np.array(digit_heights)
+    digit_areas = np.array(digit_areas)
     
     # Compute statistics
     stats = {
@@ -95,10 +103,16 @@ def compute_statistics(base_path: pathlib.Path):
             int(i): int((all_labels == i).sum()) for i in range(10)
         },
         'digit_size': {
-            'avg_size': float(np.mean(digit_sizes)),
-            'std_size': float(np.std(digit_sizes)),
-            'min_size': int(np.min(digit_sizes)),
-            'max_size': int(np.max(digit_sizes)),
+            'avg_width': float(np.mean(digit_widths)),
+            'std_width': float(np.std(digit_widths)),
+            'min_width': int(np.min(digit_widths)),
+            'max_width': int(np.max(digit_widths)),
+            'avg_height': float(np.mean(digit_heights)),
+            'std_height': float(np.std(digit_heights)),
+            'min_height': int(np.min(digit_heights)),
+            'max_height': int(np.max(digit_heights)),
+            'avg_area': float(np.mean(digit_areas)),
+            'std_area': float(np.std(digit_areas)),
         }
     }
     
@@ -106,31 +120,12 @@ def compute_statistics(base_path: pathlib.Path):
     stats['_raw_data'] = {
         'all_labels': all_labels,
         'digits_per_image': digits_per_image,
-        'digit_sizes': digit_sizes,
+        'digit_widths': digit_widths,
+        'digit_heights': digit_heights,
+        'digit_areas': digit_areas,
     }
     
     return stats
-
-
-def print_statistics(stats: dict):
-    """Print statistics in a formatted way"""
-    print("\n" + "="*70)
-    print("DATASET STATISTICS")
-    print("="*70)
-    
-    print("\n📊 Dataset Information:")
-    print(f"  Total images: {stats['dataset_info']['total_images']}")
-    print(f"  Total digits: {stats['dataset_info']['total_digits']}")
-    print(f"  Avg digits/image: {stats['dataset_info']['avg_digits_per_image']:.2f} ± {stats['dataset_info']['std_digits_per_image']:.2f}")
-    print(f"  Min digits/image: {stats['dataset_info']['min_digits_per_image']}")
-    print(f"  Max digits/image: {stats['dataset_info']['max_digits_per_image']}")
-    
-    print("\n🔢 Class Distribution:")
-    for digit, count in sorted(stats['class_distribution'].items()):
-        percentage = (count / stats['dataset_info']['total_digits']) * 100
-        bar = "█" * int(percentage / 2)
-        print(f"  Digit {digit}: {count:5d} ({percentage:5.2f}%) {bar}")
-
 
 def plot_statistics(stats: dict, save_path: str = "statistics.png"):
     """
@@ -177,20 +172,75 @@ def plot_statistics(stats: dict, save_path: str = "statistics.png"):
     for x, y in zip(unique, counts):
         ax2.text(x, y, str(y), ha='center', va='bottom', fontsize=10)
     
-    # 3. Digit Size Distribution
+    # 3. Digit Width Distribution
     ax3 = plt.subplot(2, 4, 3)
-    ax3.hist(raw['digit_sizes'], bins=30, color='green', alpha=0.7, edgecolor='black')
-    ax3.axvline(stats['digit_size']['avg_size'], color='red', linestyle='--', linewidth=2,
-                label=f"Mean: {stats['digit_size']['avg_size']:.1f}")
-    ax3.set_xlabel('Size (pixels)', fontsize=12)
+    ax3.hist(raw['digit_widths'], bins=30, color='green', alpha=0.7, edgecolor='black')
+    ax3.axvline(stats['digit_size']['avg_width'], color='red', linestyle='--', linewidth=2, 
+                label=f"Mean: {stats['digit_size']['avg_width']:.1f}")
+    ax3.set_xlabel('Width (pixels)', fontsize=12)
     ax3.set_ylabel('Frequency', fontsize=12)
-    ax3.set_title('Digit Size Distribution', fontsize=14, fontweight='bold')
+    ax3.set_title('Digit Width Distribution', fontsize=14, fontweight='bold')
     ax3.legend()
     ax3.grid(axis='y', alpha=0.3)
     
+    # 4. Digit Height Distribution
+    ax4 = plt.subplot(2, 4, 4)
+    ax4.hist(raw['digit_heights'], bins=30, color='orange', alpha=0.7, edgecolor='black')
+    ax4.axvline(stats['digit_size']['avg_height'], color='red', linestyle='--', linewidth=2,
+                label=f"Mean: {stats['digit_size']['avg_height']:.1f}")
+    ax4.set_xlabel('Height (pixels)', fontsize=12)
+    ax4.set_ylabel('Frequency', fontsize=12)
+    ax4.set_title('Digit Height Distribution', fontsize=14, fontweight='bold')
+    ax4.legend()
+    ax4.grid(axis='y', alpha=0.3)
+    
+    # 5. Digit Area Distribution
+    ax5 = plt.subplot(2, 4, 5)
+    ax5.hist(raw['digit_areas'], bins=30, color='purple', alpha=0.7, edgecolor='black')
+    ax5.axvline(stats['digit_size']['avg_area'], color='red', linestyle='--', linewidth=2,
+                label=f"Mean: {stats['digit_size']['avg_area']:.1f}")
+    ax5.set_xlabel('Area (pixels²)', fontsize=12)
+    ax5.set_ylabel('Frequency', fontsize=12)
+    ax5.set_title('Digit Area Distribution', fontsize=14, fontweight='bold')
+    ax5.legend()
+    ax5.grid(axis='y', alpha=0.3)
+    
+    # 6. Summary Statistics Table
+    ax8 = plt.subplot(2, 4, 8)
+    ax8.axis('off')
+    
+    summary_data = [
+        ['Metric', 'Value'],
+        ['Total Images', f"{stats['dataset_info']['total_images']:,}"],
+        ['Total Digits', f"{stats['dataset_info']['total_digits']:,}"],
+        ['Avg Digits/Image', f"{stats['dataset_info']['avg_digits_per_image']:.2f}"],
+        ['Avg Width', f"{stats['digit_size']['avg_width']:.1f} px"],
+        ['Avg Height', f"{stats['digit_size']['avg_height']:.1f} px"],
+        ['Avg Area', f"{stats['digit_size']['avg_area']:.1f} px²"],
+    ]
+    
+    table = ax8.table(cellText=summary_data, cellLoc='left', loc='center',
+                     colWidths=[0.6, 0.4])
+    table.auto_set_font_size(False)
+    table.set_fontsize(11)
+    table.scale(1, 2.5)
+    
+    # Style header row
+    for i in range(2):
+        table[(0, i)].set_facecolor('#4CAF50')
+        table[(0, i)].set_text_props(weight='bold', color='white')
+    
+    # Alternate row colors
+    for i in range(1, len(summary_data)):
+        for j in range(2):
+            if i % 2 == 0:
+                table[(i, j)].set_facecolor('#f0f0f0')
+    
+    ax8.set_title('Summary Statistics', fontsize=14, fontweight='bold', pad=20)
+    
     plt.tight_layout()
     plt.savefig(save_path, dpi=300, bbox_inches='tight')
-    print(f"\n📊 Statistics plot saved to {save_path}")
+    print(f"\nStatistics plot saved to {save_path}")
     plt.show()
 
 
@@ -255,7 +305,7 @@ def visualize_mosaic(base_path: pathlib.Path, num_images: int = 16, save_path: s
     
     plt.tight_layout()
     plt.savefig(save_path, dpi=150, bbox_inches='tight')
-    print(f"🖼️  Mosaic saved to {save_path}")
+    print(f"Mosaic saved to {save_path}")
     plt.show()
 
 
@@ -295,7 +345,7 @@ def visualize_single(base_path: pathlib.Path, image_idx: int = 0, save_path: str
     
     plt.tight_layout()
     plt.savefig(save_path, dpi=150, bbox_inches='tight')
-    print(f"🖼️  Image saved to {save_path}")
+    print(f"Image saved to {save_path}")
     plt.show()
 
 
@@ -324,7 +374,6 @@ if __name__ == "__main__":
     stats = compute_statistics(base_path)
     
     if args.mode in ["stats", "all"]:
-        print_statistics(stats)
         plot_statistics(stats, args.save_stats)
         
         # Save to JSON if requested
@@ -333,7 +382,7 @@ if __name__ == "__main__":
             stats_to_save = {k: v for k, v in stats.items() if k != '_raw_data'}
             with open(args.save_json, 'w') as f:
                 json.dump(stats_to_save, f, indent=4)
-            print(f"💾 Statistics saved to {args.save_json}")
+            print(f"Statistics saved to {args.save_json}")
     
     if args.mode in ["mosaic", "all"]:
         visualize_mosaic(base_path, args.num_images, args.save_mosaic)

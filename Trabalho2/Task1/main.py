@@ -41,7 +41,7 @@ def main():
     parser.add_argument('-bs', '--batch_size', type=int, default=64,
                         help='Batch size for training and testing.')
     parser.add_argument('-ep', '--experiment_path', type=str,
-                        default='/home/ville/data/savi_experiments/task1',
+                        default='/home/ville/data/savi_experiments/aula11',
                         help='Path to save experiment results.')
     parser.add_argument('-rt', '--resume_training', action='store_true',
                         help='Resume training from last checkpoint if available.')
@@ -83,9 +83,9 @@ def main():
     # Create the model
     # ------------------------------------
     # model = ModelFullyconnected()
-    # model = ModelConvNet()
+    model = ModelConvNet()
     # model = ModelConvNet3()
-    model = ModelBetterCNN()  # Use the improved model
+    # model = ModelBetterCNN()  # Use the improved model
 
     # ------------------------------------
     # Start trainin
